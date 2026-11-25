@@ -19,6 +19,13 @@ import type { CargoCategory } from '@/lib/types';
 import { Button, DemoTag, LinkButton, Select, Input } from '@/components/ui';
 import { LineIcon, useSettings } from '@/components/layout/SiteChrome';
 
+const HERO_SIZES: Record<string, string> = {
+  sm: 'text-[36px] sm:text-[48px] lg:text-[60px]',
+  md: 'text-[44px] sm:text-[64px] lg:text-[84px]',
+  lg: 'text-[52px] sm:text-[80px] lg:text-[104px]',
+  xl: 'text-[56px] sm:text-[88px] lg:text-[120px]',
+};
+
 // ───────── 1. Hero — flat brand red, very large type, one yellow highlight, pill buttons ─────────
 export function HeroSection() {
   const { t, lang } = useLang();
@@ -40,7 +47,7 @@ export function HeroSection() {
               <span className="block text-[40px] sm:text-[60px] lg:text-[74px]">{t('เชื่อมทุกการขนส่ง', 'Connecting every')}</span>
               <span className="block text-[30px] text-brand-yellow sm:text-[50px] lg:text-[60px]">{t('สร้างทุกความเป็นไปได้', 'destination & build')}</span>
             </h1>
-          ) : <h1 className="font-display text-[40px] font-extrabold leading-[1.1] sm:text-[56px]">{custom}</h1>}
+          ) : <h1 className={`font-display font-extrabold leading-[1.05] tracking-tight ${HERO_SIZES[s?.hero_title_size || 'xl']}`} style={{ color: s?.hero_title_color || '#FFD600' }}>{custom}</h1>}
           <p className="mt-5 flex flex-wrap items-baseline gap-x-3 font-display text-[24px] font-bold leading-snug sm:text-[32px]">
             {t('ชุมพร', 'Chumphon')} <span className="text-[40px] font-extrabold leading-none text-brand-yellow sm:text-[56px]">⇄</span> {t('เกาะเต่า · เกาะพะงัน', 'Koh Tao · Koh Phangan')}
           </p>

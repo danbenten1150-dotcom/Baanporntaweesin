@@ -79,7 +79,7 @@ export default function View() {
 
   return (
     <>
-      <PageHeader eyebrow={t('บัญชีของฉัน', 'My account')} title={`${t('สวัสดี', 'Hello')}, ${user.full_name}`} lead={`${user.phone}${user.account_type === 'company' ? ` · ${user.company_name || t('ลูกค้าธุรกิจ', 'Business')}` : ''}`}>
+      <PageHeader eyebrow={t('บัญชีของฉัน', 'My account')} title={`${t('สวัสดี', 'Hello')}, ${user.full_name}`} lead={`${user.phone || user.email || ''}${user.account_type === 'company' ? ` · ${user.company_name || t('ลูกค้าธุรกิจ', 'Business')}` : ''}`}>
         <div className="mt-5 flex flex-wrap gap-2">
           <LinkButton href="/booking/" variant="accent">{t('จองเรือใหม่', 'New booking')}</LinkButton>
           <Button variant="outline" onClick={async () => { await signOut(); router.push('/'); }}><LogOut className="h-4 w-4" />{t('ออกจากระบบ', 'Log out')}</Button>

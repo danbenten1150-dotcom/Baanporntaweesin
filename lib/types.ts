@@ -210,7 +210,7 @@ export interface Settings {
   address_th: string; address_en: string;
   bank_name: string; bank_account_name: string; bank_account_no: string; promptpay_id: string;
   announcement_th: string; announcement_en: string;
-  hero_title_th: string; hero_title_en: string; hero_sub_th: string; hero_sub_en: string;
+  hero_title_th: string; hero_title_en: string; hero_title_size?: 'sm' | 'md' | 'lg' | 'xl'; hero_title_color?: string; hero_sub_th: string; hero_sub_en: string;
   hero_image_url: string;
   /** Google Maps link for “ดูตำแหน่งบริษัท” */
   map_url: string;
