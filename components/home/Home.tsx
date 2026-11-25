@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import {
   Anchor, ArrowRight, BellRing, CalendarDays, ClipboardCheck, Construction, FileText, HardHat, Layers, MapPin, MousePointerClick,
-  ChevronRight, Forklift, Package, PackageSearch, Phone, Send, Ship, Truck,
+  BedDouble, ChevronRight, Forklift, Package, PackageSearch, Phone, Send, Ship, Truck,
 } from 'lucide-react';
 import { useLang } from '@/lib/i18n';
 import { api, useQuery } from '@/lib/data';
 import { CARGO_CATEGORY } from '@/lib/labels';
 import { formatTHB, todayKey } from '@/lib/utils';
+import { SLEEPER_DIR, WEEKDAY_EN, WEEKDAY_TH_SHORT, sleeperConfig } from '@/lib/sleeper';
+
+const daysShort = (w: number[], lang: 'th' | 'en') => [1, 2, 3, 4, 5, 6, 0].filter((d) => w.includes(d)).map((d) => (lang === 'th' ? WEEKDAY_TH_SHORT[d] : WEEKDAY_EN[d])).join(' ');
 import { newDraftItem, writeDraft } from '@/lib/draft';
 import type { CargoCategory } from '@/lib/types';
 import { Button, DemoTag, LinkButton, Select, Input } from '@/components/ui';
@@ -46,6 +49,9 @@ export function HeroSection() {
             <LinkButton href="/booking/" variant="white" size="lg" className="w-full rounded-full px-9 text-[19px] font-extrabold text-brand-ink sm:w-auto"><Ship className="h-6 w-6 text-brand-red" />{t('จองเรือขนส่ง', 'Book cargo')}</LinkButton>
             <LinkButton href="/quote/" variant="accent" size="lg" className="w-full rounded-full px-9 text-[19px] font-extrabold sm:w-auto"><FileText className="h-5 w-5" />{t('ขอใบเสนอราคา', 'Get a quote')}</LinkButton>
           </div>
+          <Link href="/sleeper/" className="mt-3 inline-flex min-h-12 items-center gap-2 rounded-full border-2 border-white/70 px-6 text-[17px] font-bold text-white transition hover:bg-white hover:text-brand-red">
+            <BedDouble className="h-5 w-5" />{t('จองตั๋วเรือนอน ชุมพร ⇄ เกาะเต่า', 'Sleeper boat tickets Chumphon ⇄ Koh Tao')}
+          </Link>
           <p className="mt-4 text-[15px] text-white">{t('ไม่ต้องสมัครสมาชิก · เจ้าหน้าที่โทรยืนยันทุกการจอง', 'No account needed · we call to confirm every booking')}</p>
         </div>
         <div className="relative mx-auto w-full max-w-[560px]">
@@ -64,11 +70,11 @@ export function HeroSection() {
 // ───────── 2. Services — line icons, bold titles, short lines, a small red rule ─────────
 const QUICK = [
   { href: '/booking/', icon: Ship, th: 'ขนส่งสินค้าทางเรือ', en: 'Sea freight', l: [['ชุมพร ⇄ เกาะเต่า', 'Chumphon ⇄ Koh Tao'], ['ชุมพร ⇄ เกาะพะงัน', 'Chumphon ⇄ Koh Phangan'], ['สินค้า รถยนต์ เครื่องจักร', 'Cargo, vehicles, machinery']] },
+  { href: '/sleeper/', icon: BedDouble, th: 'ตั๋วเรือนอน', en: 'Sleeper boat', l: [['ชุมพร → เกาะเต่า อ. พฤ. ส.', 'Chumphon → Tao: Tue Thu Sat'], ['เกาะเต่า → ชุมพร จ. พ. ศ.', 'Tao → Chumphon: Mon Wed Fri'], ['จองออนไลน์ ไม่ต้องสมัคร', 'Book online, no account']] },
   { href: '/materials/', icon: Layers, th: 'วัสดุก่อสร้าง', en: 'Building materials', l: [['หิน ปูน ทราย', 'Stone, cement, sand'], ['ท่อ บ่อ อิฐ เหล็ก', 'Pipes, rings, bricks, steel'], ['ส่งถึงหน้างานบนเกาะ', 'Delivered to island sites']] },
   { href: '/machinery/#crane', icon: Construction, th: 'บริการรถเครน', en: 'Crane service', l: [['ยก-ขนย้ายของหนัก', 'Heavy lifting'], ['ท่อ บ่อ โครงเหล็ก', 'Pipes, rings, steel'], ['พร้อมพนักงานควบคุม', 'With operator']] },
   { href: '/machinery/#dump_truck', icon: Truck, th: 'รถดัมพ์และเครื่องจักร', en: 'Trucks & machinery', l: [['รถดัมพ์ขนวัสดุ', 'Dump trucks'], ['รถแบคโฮ เครื่องจักรหนัก', 'Excavators, heavy plant'], ['รายชั่วโมง / รายวัน', 'Hourly or daily']] },
   { href: '/construction/', icon: HardHat, th: 'รับเหมาก่อสร้าง', en: 'Construction', l: [['บ้าน อาคาร รีโนเวท', 'Houses, buildings, renovation'], ['ฐานราก งานคอนกรีต', 'Foundations, concrete'], ['ดูหน้างานก่อนเสนอราคา', 'Site visit before quoting']] },
-  { href: '/track/', icon: PackageSearch, th: 'ติดตามสินค้า', en: 'Track shipment', l: [['ใช้เลขอ้างอิง + เบอร์โทร', 'Reference + phone'], ['ดูสถานะทุกขั้นตอน', 'See every step'], ['ไม่ต้องสมัครสมาชิก', 'No account needed']] },
 ];
 export function QuickServices() {
   const { t } = useLang();
@@ -172,6 +178,16 @@ export function HowToAndRates() {
                 </div>
               );
             })}
+            {(['cpn_tao', 'tao_cpn'] as const).map((k) => { const l = sleeperConfig(store?.settings).legs[k]; return (
+              <div key={k}>
+                <p className="flex items-center gap-2 bg-brand-dark px-5 py-3.5 font-display text-[18px] font-bold text-white md:text-[20px]"><BedDouble className="h-5 w-5 text-brand-yellow" />{t('เรือนอน', 'Sleeper')} {lang === 'th' ? SLEEPER_DIR[k].th : SLEEPER_DIR[k].en}</p>
+                <dl className="grid grid-cols-3 bg-brand-grey text-center">
+                  <div className="border-r border-white p-3"><dt className="text-[14px] font-semibold text-neutral-600">{t('ราคา/ท่าน', 'Per person')}</dt><dd className="mt-0.5 text-[17px] font-bold">{l.price != null ? formatTHB(l.price, lang).replace('.00', '') : t('สอบถามราคา', 'Ask us')}</dd></div>
+                  <div className="border-r border-white p-3"><dt className="text-[14px] font-semibold text-neutral-600">{t('วันเรือออก', 'Days')}</dt><dd className="mt-0.5 text-[16px] font-bold">{daysShort(l.weekdays, lang)}</dd></div>
+                  <div className="p-3"><dt className="text-[14px] font-semibold text-neutral-600">{t('เวลาออก', 'Departs')}</dt><dd className="mt-0.5 text-[17px] font-bold">{l.depart_time || t('แจ้งเมื่อยืนยัน', 'On confirmation')}</dd></div>
+                </dl>
+              </div>
+            ); })}
             <p className="bg-brand-red px-5 py-3.5 font-display text-[18px] font-bold text-white md:text-[20px]">{t('รถเครน · รถดัมพ์ · เครื่องจักร · วัสดุก่อสร้าง', 'Cranes · trucks · machinery · materials')}</p>
             <div className="flex items-center justify-between gap-3 bg-brand-grey px-5 py-4"><span className="text-[16px]">{t('ราคาขึ้นกับงานและปริมาณ', 'Depends on job and quantity')}</span><LinkButton href="/quote/" variant="outline" size="sm" className="rounded-full">{t('ขอใบเสนอราคา', 'Get a quote')}</LinkButton></div>
           </div>

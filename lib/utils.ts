@@ -48,7 +48,7 @@ export function uid() {
 
 const REF_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 /** Human friendly unique reference, e.g. BPT-C-261125-7KQ4M */
-export function makeRef(prefix: 'C' | 'K' | 'M' | 'O' | 'Q' | 'P') {
+export function makeRef(prefix: 'C' | 'K' | 'M' | 'O' | 'Q' | 'P' | 'S') {
   const d = bkkDateKey(new Date()).replace(/-/g, '').slice(2);
   let rand = '';
   const buf = new Uint32Array(5);

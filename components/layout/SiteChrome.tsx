@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
-  CalendarClock, ChevronDown, ChevronRight, Construction, Globe, HardHat, Headphones, Home, LayoutDashboard, LayoutGrid, Layers, LogIn,
+  BedDouble, CalendarClock, ChevronDown, ChevronRight, Construction, Globe, HardHat, Headphones, Home, LayoutDashboard, LayoutGrid, Layers, LogIn,
   Mail, MapPin, Menu, MessageCircle, PackageSearch, Phone, Ship, ShieldCheck, ShoppingCart, Truck, User, X,
 } from 'lucide-react';
 import { useLang } from '@/lib/i18n';
@@ -15,10 +15,11 @@ import { IS_DEMO, SITE } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { buttonClass } from '@/components/ui';
 
-/** Main navigation — six items; extra services live under “บริการของเรา”. */
+/** Main navigation — seven items; extra services live under “บริการของเรา”. */
 export const NAV = [
   { href: '/', th: 'หน้าแรก', en: 'Home' },
   { href: '/booking/', th: 'จองเรือขนส่ง', en: 'Book Cargo' },
+  { href: '/sleeper/', th: 'ตั๋วเรือนอน', en: 'Sleeper Boat' },
   { href: '/services/', th: 'บริการของเรา', en: 'Services', menu: true },
   { href: '/track/', th: 'ติดตามสถานะ', en: 'Track' },
   { href: '/about/', th: 'เกี่ยวกับเรา', en: 'About' },
@@ -26,6 +27,7 @@ export const NAV = [
 ];
 export const SERVICE_LINKS = [
   { href: '/booking/', icon: Ship, th: 'จองเรือขนส่งสินค้า', en: 'Book cargo shipping', dth: 'ชุมพร ⇄ เกาะเต่า / เกาะพะงัน', den: 'Chumphon ⇄ Koh Tao / Koh Phangan' },
+  { href: '/sleeper/', icon: BedDouble, th: 'จองตั๋วเรือนอน', en: 'Sleeper boat tickets', dth: 'ชุมพร ⇄ เกาะเต่า', den: 'Chumphon ⇄ Koh Tao' },
   { href: '/schedule/', icon: CalendarClock, th: 'ตารางเดินเรือ', en: 'Shipping schedule', dth: 'ดูรอบเรือที่ว่าง', den: 'See open sailings' },
   { href: '/materials/', icon: Layers, th: 'สั่งวัสดุก่อสร้าง', en: 'Order materials', dth: 'หิน ปูน ทราย ท่อ บ่อ เหล็ก', den: 'Stone, cement, sand, pipes, steel' },
   { href: '/construction/', icon: HardHat, th: 'รับเหมาก่อสร้าง', en: 'Construction work', dth: 'ขอประเมินราคาฟรี', den: 'Request a quotation' },
@@ -198,7 +200,7 @@ export function Header() {
                 </Link>
               ))}
               <p className="mt-4 px-4 pb-1 text-sm font-semibold text-neutral-500">{t('บริการของเรา', 'Our services')}</p>
-              {SERVICE_LINKS.slice(1).map((s) => (
+              {SERVICE_LINKS.filter((l) => !NAV.some((n) => n.href === l.href)).map((s) => (
                 <Link key={s.href} href={s.href} className="flex min-h-[52px] items-center gap-3 rounded-xl px-4 text-[17px] font-medium hover:bg-brand-grey">
                   <s.icon className="h-5 w-5 text-brand-red" />{t(s.th, s.en)}
                 </Link>

@@ -126,6 +126,34 @@ export interface MachineryBooking {
   created_at: string; is_demo?: boolean;
 }
 
+// ───────── Sleeper boat (passenger tickets) ─────────
+export type SleeperDirection = 'cpn_tao' | 'tao_cpn';
+export interface SleeperLeg {
+  /** JS weekday numbers, 0 = Sunday … 6 = Saturday */
+  weekdays: number[];
+  depart_time: string; // 'HH:MM' or '' = staff confirms
+  arrive_time: string;
+  berths: number | null; // null = staff confirms availability
+  price: number | null; // per passenger, null = staff confirms
+}
+export interface SleeperSettings {
+  enabled: boolean;
+  legs: Record<SleeperDirection, SleeperLeg>;
+  /** dates with no sailing (weather, holidays), 'YYYY-MM-DD' */
+  closed_dates: string[];
+  note_th: string; note_en: string;
+}
+export type SleeperStatus = 'pending_review' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
+export interface SleeperPassenger { full_name: string; nationality?: string }
+export interface SleeperBooking {
+  id: ID; ref: string; customer_id?: ID | null;
+  direction: SleeperDirection; travel_date: string;
+  passengers: SleeperPassenger[]; seats: number;
+  contact: ContactInfo; notes?: string;
+  status: SleeperStatus; price: number | null;
+  history: StatusEvent[]; created_at: string; is_demo?: boolean;
+}
+
 export interface ProductCategory { id: ID; slug: string; name_th: string; name_en: string; sort: number }
 
 export interface Product {
@@ -193,6 +221,7 @@ export interface Settings {
   deposit_percent: number | null;
   transport_modes: Record<TransportMode, boolean>;
   construction_services: Record<ConstructionService, boolean>;
+  sleeper: SleeperSettings;
 }
 
 export type GalleryCategory = 'cargo' | 'fleet' | 'machinery' | 'projects' | 'delivery';
@@ -210,6 +239,7 @@ export interface Store {
   ports: Port[]; routes: Route[]; vessels: Vessel[]; schedules: Schedule[];
   cargo: CargoBooking[]; construction: ConstructionRequest[];
   machinery: Machinery[]; machineryBookings: MachineryBooking[];
+  sleeperBookings: SleeperBooking[];
   categories: ProductCategory[]; products: Product[]; orders: Order[];
   quotations: Quotation[]; payments: Payment[];
   notifications: AppNotification[]; audit: AuditLog[]; users: UserProfile[];
@@ -218,7 +248,7 @@ export interface Store {
 export type Collection = Exclude<keyof Store, 'settings'>;
 
 export interface TrackResult {
-  kind: QuotationKind; ref: string; status: string; payment_status?: PaymentStatus;
+  kind: QuotationKind | 'sleeper'; ref: string; status: string; payment_status?: PaymentStatus;
   route?: string; service_label_th: string; service_label_en: string;
   eta?: string | null; history: StatusEvent[]; created_at: string;
 }

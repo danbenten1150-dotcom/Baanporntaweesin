@@ -4,6 +4,6 @@ import { SITE } from '@/lib/config';
 export const dynamic = 'force-static';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const pages = ['', 'about', 'services', 'schedule', 'booking', 'materials', 'construction', 'machinery', 'track', 'contact', 'quote', 'privacy', 'terms'];
+  const pages = ['', 'about', 'services', 'schedule', 'booking', 'sleeper', 'materials', 'construction', 'machinery', 'track', 'contact', 'quote', 'privacy', 'terms'];
   return pages.map((p) => ({ url: `${SITE.url}/${p ? p + '/' : ''}`, changeFrequency: p === 'schedule' ? 'daily' : 'weekly', priority: p === '' ? 1 : 0.7 }));
 }

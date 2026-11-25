@@ -8,13 +8,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   BookingStatus, CargoBooking, Collection, ConstructionRequest, ConstructionStatus, MachineryBooking,
-  MachineryBookingStatus, Order, OrderStatus, Payment, Quotation, Settings, StatusEvent, Store, TrackResult, UserProfile,
+  MachineryBookingStatus, Order, OrderStatus, Payment, Quotation, Settings, SleeperBooking, SleeperStatus, StatusEvent, Store, TrackResult, UserProfile,
 } from '../types';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../config';
 import { defaultSettings } from './seed';
 import { emitChange, type CustomerBundle, type DataApi } from './api';
 import {
-  BusinessError, ValidationError, cargoBookingSchema, constructionSchema, flattenErrors, machinerySchema, orderSchema, quoteRequestSchema,
+  BusinessError, ValidationError, cargoBookingSchema, constructionSchema, flattenErrors, machinerySchema, orderSchema, quoteRequestSchema, sleeperSchema,
 } from '../validation';
 import { normalizePhone, uid } from '../utils';
 import type { z } from 'zod';
@@ -42,6 +42,9 @@ const BUSINESS_TEXT: Record<string, [string, string]> = {
   mode_disabled: ['รูปแบบการขนส่งนี้ยังไม่เปิดให้บริการ', 'Transport option not available.'],
   service_disabled: ['บริการนี้ยังไม่เปิดให้บริการ', 'Service not offered.'],
   not_found: ['ไม่พบข้อมูล', 'Not found.'],
+  sleeper_closed: ['ขณะนี้ยังไม่เปิดรับจองตั๋วเรือนอน', 'Sleeper-boat booking is not open right now.'],
+  no_sailing: ['วันที่เลือกไม่มีเรือนอนออก กรุณาเลือกวันอื่น', 'No sleeper boat on that date — please pick another day.'],
+  berths: ['ที่นอนในรอบนี้ไม่พอ กรุณาเลือกวันอื่นหรือลดจำนวนผู้โดยสาร', 'Not enough berths on this sailing.'],
   needs_details: ['ต้องระบุรอบเรือและน้ำหนักให้ครบก่อนยืนยัน', 'Assign a sailing and fill in all weights first.'],
 };
 
@@ -66,7 +69,7 @@ function validate<T>(schema: z.ZodType<T>, input: unknown): T {
 
 const TABLE: Record<Collection, string> = {
   ports: 'ports', routes: 'routes', vessels: 'vessels', schedules: 'sailing_schedules', cargo: 'cargo_bookings',
-  construction: 'construction_requests', machinery: 'machinery', machineryBookings: 'machinery_bookings',
+  construction: 'construction_requests', machinery: 'machinery', machineryBookings: 'machinery_bookings', sleeperBookings: 'sleeper_bookings',
   categories: 'product_categories', products: 'products', orders: 'orders', quotations: 'quotations', payments: 'payments',
   notifications: 'notifications', audit: 'audit_logs', users: 'profiles',
 };
@@ -82,7 +85,7 @@ export function startRealtime() {
   realtimeStarted = true;
   supabase().then((db) => {
     const ch = db.channel('bpt-live');
-    for (const table of ['cargo_bookings', 'construction_requests', 'machinery_bookings', 'orders', 'payments', 'notifications'])
+    for (const table of ['cargo_bookings', 'construction_requests', 'machinery_bookings', 'sleeper_bookings', 'orders', 'payments', 'notifications'])
       ch.on('postgres_changes', { event: '*', schema: 'public', table }, () => emitChange());
     ch.subscribe();
   });
@@ -139,6 +142,7 @@ export class SupabaseApi implements DataApi {
       q('quotations', 'created_at'), q('quotation_items', 'sort'), q('payments', 'created_at'), q('notifications', 'created_at'),
       q('audit_logs', 'at'), q('profiles'),
     ]);
+    const sleeper = await q('sleeper_bookings', 'created_at');
     return {
       settings,
       ports: ports as unknown as Store['ports'], routes: routes as unknown as Store['routes'],
@@ -149,6 +153,7 @@ export class SupabaseApi implements DataApi {
 
       construction: construction.map((c) => ({ ...c, files: [], history: historyFor(history, 'construction', String(c.id)) })) as unknown as ConstructionRequest[],
       machineryBookings: mBookings.map((m) => ({ ...m, files: [], history: historyFor(history, 'machinery', String(m.id)) })) as unknown as MachineryBooking[],
+      sleeperBookings: sleeper.map((b) => ({ ...b, history: historyFor(history, 'sleeper', String(b.id)) })) as unknown as SleeperBooking[],
       orders: orders.map((o) => ({ ...o, items: orderItems.filter((i) => i.order_id === o.id), history: historyFor(history, 'order', String(o.id)) })) as unknown as Order[],
       quotations: quotations.map((x) => ({ ...x, items: qItems.filter((i) => i.quotation_id === x.id) })) as unknown as Quotation[],
       payments: payments.map((p) => ({ ...p, slip_name: p.slip_path })) as unknown as Payment[],
@@ -184,6 +189,20 @@ export class SupabaseApi implements DataApi {
     const r = await this.rpc<{ id: string; ref: string }>('submit_machinery_booking', { payload: v });
     return { ...(v as unknown as MachineryBooking), id: r.id, ref: r.ref, status: 'pending_review', history: [], created_at: new Date().toISOString() } as MachineryBooking;
   }
+  async createSleeperBooking(input: Parameters<DataApi['createSleeperBooking']>[0]) {
+    await this.c();
+    const v = validate(sleeperSchema, input);
+    const r = await this.rpc<{ id: string; ref: string }>('submit_sleeper_booking', { payload: v });
+    return { ...(v as unknown as SleeperBooking), id: r.id, ref: r.ref, seats: v.passengers.length, status: 'pending_review', price: null, history: [], created_at: new Date().toISOString() } as SleeperBooking;
+  }
+  async sleeperTaken(direction: SleeperBooking['direction']) {
+    await this.c();
+    const { data, error } = await this.db.rpc('sleeper_taken', { p_direction: direction });
+    fail(error);
+    const out: Record<string, number> = {};
+    for (const r of (data as { travel_date: string; seats: number }[]) || []) out[r.travel_date] = Number(r.seats);
+    return out;
+  }
   async createOrder(input: Parameters<DataApi['createOrder']>[0]) {
     await this.c();
     const v = validate(orderSchema, input);
@@ -206,7 +225,7 @@ export class SupabaseApi implements DataApi {
     await this.c();
     const s = await this.getStore(); // RLS returns only the signed-in customer's rows
     return {
-      cargo: s.cargo, construction: s.construction, machinery: s.machineryBookings, orders: s.orders,
+      cargo: s.cargo, construction: s.construction, machinery: s.machineryBookings, sleeper: s.sleeperBookings, orders: s.orders,
       quotations: s.quotations, payments: s.payments, notifications: s.notifications.filter((n) => n.audience === 'customer'),
     };
   }
@@ -279,6 +298,7 @@ export class SupabaseApi implements DataApi {
     await this.rpc('set_machinery_status', { p_id: id, p_status: status, p_machinery_id: machinery_id, p_note: note });
   }
   async setOrderStatus(id: string, status: OrderStatus, note: string) { await this.rpc('set_order_status', { p_id: id, p_status: status, p_note: note }); }
+  async setSleeperStatus(id: string, status: SleeperStatus, price: number | null, note: string) { await this.rpc('set_sleeper_status', { p_id: id, p_status: status, p_price: price, p_note: note }); }
   async createQuotation(q: Parameters<DataApi['createQuotation']>[0]) {
     await this.c();
     const r = await this.rpc<{ id: string; ref: string }>('create_quotation', { payload: q });

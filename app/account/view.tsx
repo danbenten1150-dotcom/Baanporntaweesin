@@ -13,8 +13,9 @@ import { formatDate, formatTHB } from '@/lib/utils';
 import { Alert, Badge, Button, DemoTag, EmptyState, Field, FilePicker, Input, LinkButton, Modal, PageHeader, Segmented, Select, Spinner, StatusBadge, Tabs, useToast } from '@/components/ui';
 import { downloadSummary, Timeline } from '@/components/shared/forms';
 import { useSettings } from '@/components/layout/SiteChrome';
+import { SLEEPER_DIR, dateLabel } from '@/lib/sleeper';
 
-type TabId = 'overview' | 'cargo' | 'construction' | 'machinery' | 'orders' | 'quotations' | 'payments' | 'documents' | 'profile';
+type TabId = 'overview' | 'cargo' | 'sleeper' | 'construction' | 'machinery' | 'orders' | 'quotations' | 'payments' | 'documents' | 'profile';
 
 export function downloadQuotation(q: Quotation, lang: 'th' | 'en', invoice = false) {
   const { sub, vat, total } = quotationTotal(q);
@@ -61,6 +62,7 @@ export default function View() {
   const tabs: { value: TabId; label: string; count?: number }[] = [
     { value: 'overview', label: t('ภาพรวม', 'Overview'), count: unread || undefined },
     { value: 'cargo', label: t('การจองเรือ', 'Ship bookings'), count: data?.cargo.length },
+    { value: 'sleeper', label: t('ตั๋วเรือนอน', 'Sleeper boat'), count: data?.sleeper?.length },
     { value: 'construction', label: t('งานก่อสร้าง', 'Construction'), count: data?.construction.length },
     { value: 'machinery', label: t('เช่าเครื่องจักร', 'Machinery'), count: data?.machinery.length },
     { value: 'orders', label: t('ซื้อวัสดุ', 'Materials'), count: data?.orders.length },
@@ -144,6 +146,11 @@ export default function View() {
                 ))}</div>
               ))}
 
+              {tab === 'sleeper' && (!data.sleeper?.length ? <EmptyState title={t('ยังไม่มีการจองตั๋วเรือนอน', 'No sleeper-boat bookings')} action={<LinkButton href="/sleeper/">{t('จองตั๋วเรือนอน', 'Book sleeper boat')}</LinkButton>} /> : (
+                <div className="grid gap-4 lg:grid-cols-2">{data.sleeper.map((b) => (
+                  <div key={b.id} className="card flex flex-wrap items-start justify-between gap-2 p-5"><div><p className="font-mono font-bold">{b.ref}</p><p className="text-[15px] text-neutral-600">{lang === 'th' ? SLEEPER_DIR[b.direction].th : SLEEPER_DIR[b.direction].en} · {dateLabel(b.travel_date, lang, true)} · {b.seats} {t('ท่าน', 'pax')}</p><p className="text-[15px] font-semibold">{b.price != null ? formatTHB(b.price, lang) : t('รอเจ้าหน้าที่ยืนยันราคา', 'Awaiting staff price')}</p></div><StatusBadge status={b.status} /></div>
+                ))}</div>
+              ))}
               {tab === 'machinery' && (data.machinery.length === 0 ? <EmptyState title={t('ยังไม่มีการเช่าเครื่องจักร', 'No machinery bookings')} action={<LinkButton href="/machinery/">{t('ขอเช่า', 'Request rental')}</LinkButton>} /> : (
                 <div className="grid gap-4 lg:grid-cols-2">{data.machinery.map((m) => (
                   <div key={m.id} className="card flex flex-wrap items-start justify-between gap-2 p-5"><div><p className="font-mono font-bold">{m.ref}</p><p className="text-sm text-neutral-500">{pick(MACHINERY_TYPE[m.machinery_type])} · {m.location} · {m.start_date} · {m.duration} {m.rate_unit === 'day' ? t('วัน', 'd') : t('ชม.', 'h')}</p></div><StatusBadge status={m.status} /></div>

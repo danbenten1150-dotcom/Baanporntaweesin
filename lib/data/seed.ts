@@ -8,6 +8,19 @@ import { ENV_CONTACT } from '../config';
 
 const ALL_TRUE = <K extends string>(keys: K[]) => Object.fromEntries(keys.map((k) => [k, true])) as Record<K, boolean>;
 
+/** Sailing days given by the owner: Chumphon → Koh Tao Tue/Thu/Sat, Koh Tao → Chumphon Mon/Wed/Fri.
+ *  Times, berths and fares are left blank on purpose — the admin fills them in. */
+export function defaultSleeper(): Settings['sleeper'] {
+  return {
+    enabled: true,
+    legs: {
+      cpn_tao: { weekdays: [2, 4, 6], depart_time: '', arrive_time: '', berths: null, price: null },
+      tao_cpn: { weekdays: [1, 3, 5], depart_time: '', arrive_time: '', berths: null, price: null },
+    },
+    closed_dates: [], note_th: '', note_en: '',
+  };
+}
+
 export function defaultSettings(): Settings {
   return {
     phone: ENV_CONTACT.phone, email: ENV_CONTACT.email,
@@ -26,6 +39,7 @@ export function defaultSettings(): Settings {
     deposit_percent: null,
     transport_modes: ALL_TRUE(['port_to_port', 'door_to_port', 'port_to_door', 'door_to_door']),
     construction_services: ALL_TRUE(['residential', 'commercial', 'renovation', 'land_preparation', 'excavation', 'foundation', 'concrete', 'demolition', 'general']),
+    sleeper: defaultSleeper(),
   };
 }
 
@@ -35,6 +49,12 @@ function bkkISO(dayOffset: number, hh: number, mm = 0) {
   const bkkNow = new Date(now.getTime() + 7 * 3600_000);
   const y = bkkNow.getUTCFullYear(), m = bkkNow.getUTCMonth(), d = bkkNow.getUTCDate() + dayOffset;
   return new Date(Date.UTC(y, m, d, hh - 7, mm)).toISOString();
+}
+
+/** next date (Asia/Bangkok, YYYY-MM-DD) that falls on JS weekday `wd` */
+function nextWeekday(wd: number) {
+  for (let i = 1; i <= 7; i++) { const d = bkkISO(i, 12).slice(0, 10); if (new Date(d + 'T00:00:00Z').getUTCDay() === wd) return d; }
+  return bkkISO(1, 12).slice(0, 10);
 }
 
 export function demoSeed(): Store {
@@ -145,6 +165,12 @@ export function demoSeed(): Store {
       start_date: bkkISO(5, 8).slice(0, 10), duration: 2, rate_unit: 'day', operator: true,
       description: 'คำขอตัวอย่าง', files: [], contact: demoContact, status: 'pending_review',
       history: [{ status: 'pending_review', at: bkkISO(-1, 16) }], created_at: bkkISO(-1, 16), is_demo: true,
+    }],
+    sleeperBookings: [{
+      id: 'sb-demo-1', ref: 'BPT-S-DEMO-0001', direction: 'cpn_tao', travel_date: nextWeekday(2),
+      passengers: [{ full_name: 'ผู้โดยสารตัวอย่าง 1' }, { full_name: 'ผู้โดยสารตัวอย่าง 2' }], seats: 2,
+      contact: demoContact, status: 'pending_review', price: null,
+      history: [{ status: 'pending_review', at: bkkISO(-1, 18) }], created_at: bkkISO(-1, 18), is_demo: true,
     }],
     categories, products,
     orders: [],

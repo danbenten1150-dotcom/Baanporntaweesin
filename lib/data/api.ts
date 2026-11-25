@@ -1,12 +1,13 @@
 import type {
   AppNotification, BookingStatus, CargoBooking, Collection, ConstructionRequest, ConstructionStatus,
-  MachineryBooking, MachineryBookingStatus, Order, OrderStatus, Payment, Quotation, Settings, Store, TrackResult,
-  UserProfile,
+  MachineryBooking, MachineryBookingStatus, Order, OrderStatus, Payment, Quotation, Settings, SleeperBooking, SleeperStatus,
+  Store, TrackResult, UserProfile,
 } from '../types';
 
 export type CargoBookingInput = Omit<CargoBooking, 'id' | 'ref' | 'status' | 'payment_status' | 'price' | 'estimated_price' | 'history' | 'created_at' | 'needs_review'> & { accept_terms: true; notes?: string };
 export type ConstructionInput = Omit<ConstructionRequest, 'id' | 'ref' | 'status' | 'progress' | 'history' | 'created_at'> & { accept_terms: true };
 export type MachineryInput = Omit<MachineryBooking, 'id' | 'ref' | 'status' | 'history' | 'created_at' | 'machinery_id'> & { accept_terms: true };
+export type SleeperInput = Pick<SleeperBooking, 'direction' | 'travel_date' | 'passengers' | 'contact' | 'notes'> & { accept_terms: true };
 export interface OrderInput {
   lines: { product_id: string; qty: number }[];
   delivery_location: string; with_transport: boolean; route_id?: string | null; notes?: string;
@@ -18,7 +19,7 @@ export interface PaymentInput {
 }
 
 export interface CustomerBundle {
-  cargo: CargoBooking[]; construction: ConstructionRequest[]; machinery: MachineryBooking[];
+  cargo: CargoBooking[]; construction: ConstructionRequest[]; machinery: MachineryBooking[]; sleeper: SleeperBooking[];
   orders: Order[]; quotations: Quotation[]; payments: Payment[]; notifications: AppNotification[];
 }
 
@@ -42,6 +43,10 @@ export interface DataApi {
   createConstructionRequest(input: ConstructionInput): Promise<ConstructionRequest>;
   createMachineryBooking(input: MachineryInput): Promise<MachineryBooking>;
   createOrder(input: OrderInput): Promise<Order>;
+  /** Sleeper-boat ticket request. Checks sailing day, closed dates and berths; always starts as pending_review. */
+  createSleeperBooking(input: SleeperInput): Promise<SleeperBooking>;
+  /** Berths already held per date for one direction (public; no personal data). */
+  sleeperTaken(direction: SleeperBooking['direction']): Promise<Record<string, number>>;
   createQuoteRequest(input: { service: string; message: string; contact: Order['contact'] }): Promise<{ ref: string }>;
   track(ref: string, phone: string): Promise<TrackResult | null>;
 
@@ -64,6 +69,8 @@ export interface DataApi {
   updateConstruction(id: string, patch: Partial<ConstructionRequest>, status: ConstructionStatus | null, note: string, actor: string): Promise<void>;
   setMachineryStatus(id: string, status: MachineryBookingStatus, machinery_id: string | null, note: string, actor: string): Promise<void>;
   setOrderStatus(id: string, status: OrderStatus, note: string, actor: string): Promise<void>;
+  /** Staff decision on a sleeper ticket; price = total for the booking (null keeps “awaiting price”). */
+  setSleeperStatus(id: string, status: SleeperStatus, price: number | null, note: string, actor: string): Promise<void>;
   createQuotation(q: Omit<Quotation, 'id' | 'ref' | 'created_at' | 'status'>, actor: string): Promise<Quotation>;
   verifyPayment(id: string, ok: boolean, note: string, actor: string): Promise<void>;
   resetDemo(): Promise<void>;

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, CalendarClock, ClipboardList, ExternalLink, Forklift, Gauge, HardHat, Layers, Lock, LogOut, Settings, Users, Wallet } from 'lucide-react';
+import { BarChart3, BedDouble, Bell, CalendarClock, ClipboardList, ExternalLink, Forklift, Gauge, HardHat, Layers, Lock, LogOut, Settings, Users, Wallet } from 'lucide-react';
 import { useLang } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { api, useQuery } from '@/lib/data';
@@ -14,11 +14,13 @@ import { Schedules, Vessels } from '@/components/admin/ops';
 import { Bookings } from '@/components/admin/bookings';
 import { NotificationCenter, Overview, Reports } from '@/components/admin/overview';
 import { MediaAdmin } from '@/components/admin/media';
+import { SleeperAdmin } from '@/components/admin/sleeper';
 import { ConstructionAdmin, CustomersAdmin, FinanceAdmin, MachineryAdmin, OrdersAdmin, ProductsAdmin, WebsiteAdmin } from '@/components/admin/biz';
 
 const MODULES = [
   { id: 'overview', icon: Gauge, th: 'ภาพรวม', en: 'Overview' },
   { id: 'bookings', icon: ClipboardList, th: 'รายการจองเรือ', en: 'Ship bookings' },
+  { id: 'sleeper', icon: BedDouble, th: 'ตั๋วเรือนอน', en: 'Sleeper boat' },
   { id: 'schedules', icon: CalendarClock, th: 'ตารางเดินเรือ', en: 'Schedules' },
   { id: 'construction', icon: HardHat, th: 'งานก่อสร้าง', en: 'Construction' },
   { id: 'materials', icon: Layers, th: 'วัสดุก่อสร้าง', en: 'Materials' },
@@ -55,7 +57,7 @@ export default function View() {
   const seen = useRef<number | null>(null);
   useEffect(() => {
     if (!s) return;
-    const n = s.cargo.length + s.construction.length + s.machineryBookings.length + s.orders.length;
+    const n = s.cargo.length + s.construction.length + s.machineryBookings.length + s.orders.length + s.sleeperBookings.length;
     if (seen.current != null && n > seen.current) toast(t('มีคำขอใหม่เข้ามา', 'A new request just arrived'), 'info');
     seen.current = n;
   }, [s, toast, t]);
@@ -84,6 +86,7 @@ export default function View() {
     construction: s.construction.filter((c) => c.status === 'submitted').length,
     materials: s.orders.filter((o) => o.status === 'quotation_requested').length,
     machinery: s.machineryBookings.filter((m) => m.status === 'pending_review').length,
+    sleeper: s.sleeperBookings.filter((b) => b.status === 'pending_review').length,
     finance: s.payments.filter((p) => p.status === 'pending').length,
   };
   const current = MODULES.find((m) => m.id === mod)!;
@@ -120,6 +123,7 @@ export default function View() {
 
           {mod === 'overview' && <Overview s={s} go={go} openBooking={(ref) => { setOpenRef(ref); setMod('bookings'); history.replaceState(null, '', '#bookings'); }} />}
           {mod === 'bookings' && <Bookings key={openRef || 'list'} s={s} openRef={openRef} />}
+          {mod === 'sleeper' && <SleeperAdmin s={s} sub={sub} setSub={setSub} />}
           {mod === 'schedules' && <SubTabs value={sub || 'schedules'} onChange={setSub} items={[['schedules', t('รอบเดินเรือและเส้นทาง', 'Sailings & routes')], ['vessels', t('เรือ', 'Vessels')]]}>
             {(v) => v === 'vessels' ? <Vessels s={s} /> : <Schedules s={s} />}</SubTabs>}
           {mod === 'construction' && <ConstructionAdmin s={s} />}

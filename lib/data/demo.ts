@@ -6,13 +6,15 @@
 
 import type {
   BookingStatus, CargoBooking, Collection, ConstructionRequest, ConstructionStatus, MachineryBooking,
-  MachineryBookingStatus, Order, OrderStatus, Payment, Quotation, Settings, StatusEvent, Store, TrackResult, UserProfile,
+  MachineryBookingStatus, Order, OrderStatus, Payment, Quotation, Settings, SleeperBooking, SleeperStatus, StatusEvent, Store,
+  TrackResult, UserProfile,
 } from '../types';
+import { SLEEPER_DIR, isSailingDate, seatsTaken, sleeperConfig } from '../sleeper';
 import { defaultSettings, demoSeed } from './seed';
 import { DATA_EVENT, emitChange, quotationTotal, type DataApi } from './api';
 import {
   BusinessError, ValidationError, cargoBookingSchema, constructionSchema, flattenErrors, machinerySchema,
-  orderSchema, quoteRequestSchema,
+  orderSchema, quoteRequestSchema, sleeperSchema,
 } from '../validation';
 import { VEHICLE_CATEGORIES } from '../labels';
 import { makeRef, normalizePhone, toTons, uid } from '../utils';
@@ -27,7 +29,7 @@ function load(): Store {
   if (memory) return memory;
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) { memory = JSON.parse(raw) as Store; memory.settings = { ...defaultSettings(), ...memory.settings }; return memory; }
+    if (raw) { memory = JSON.parse(raw) as Store; memory.settings = { ...defaultSettings(), ...memory.settings }; memory.sleeperBookings ||= []; return memory; }
   } catch { /* fall through */ }
   memory = demoSeed();
   save();
@@ -192,6 +194,56 @@ export class DemoApi implements DataApi {
     return structuredClone(b);
   }
 
+  async createSleeperBooking(input: Parameters<DataApi['createSleeperBooking']>[0]) {
+    const v = validate(sleeperSchema, input);
+    await wait();
+    const s = load();
+    const cfg = sleeperConfig(s.settings);
+    if (!cfg.enabled) throw new BusinessError('sleeper_closed', 'ขณะนี้ยังไม่เปิดรับจองตั๋วเรือนอน', 'Sleeper-boat booking is not open right now.');
+    if (!isSailingDate(s.settings, v.direction, v.travel_date)) throw new BusinessError('no_sailing', 'วันที่เลือกไม่มีเรือนอนออก กรุณาเลือกวันอื่น', 'No sleeper boat on that date — please pick another day.');
+    const berths = cfg.legs[v.direction].berths;
+    if (berths != null && seatsTaken(s.sleeperBookings, v.direction, v.travel_date) + v.passengers.length > berths)
+      throw new BusinessError('berths', 'ที่นอนในรอบนี้ไม่พอ กรุณาเลือกวันอื่นหรือลดจำนวนผู้โดยสาร', 'Not enough berths on this sailing.');
+    const b: SleeperBooking = {
+      id: uid(), ref: makeRef('S'), direction: v.direction, travel_date: v.travel_date,
+      passengers: v.passengers, seats: v.passengers.length, notes: v.notes || undefined,
+      contact: { ...v.contact, phone: normalizePhone(v.contact.phone) } as SleeperBooking['contact'],
+      status: 'pending_review', price: null, history: [ev('pending_review')], created_at: now(), is_demo: true,
+    };
+    s.sleeperBookings.unshift(b);
+    notify(s, { audience: 'admin', th: 'มีคำขอจองตั๋วเรือนอนใหม่', en: 'New sleeper-boat request', body: `${b.ref} · ${SLEEPER_DIR[b.direction].th} · ${b.travel_date} · ${b.seats} ท่าน`, link: '/admin/#sleeper' });
+    notify(s, { audience: 'customer', phone: b.contact.phone, th: 'ได้รับคำขอจองตั๋วเรือนอนแล้ว', en: 'Sleeper-boat request received', body: b.ref });
+    audit(s, 'customer', 'create', 'sleeper_booking', b.ref);
+    save();
+    return structuredClone(b);
+  }
+
+  async sleeperTaken(direction: SleeperBooking['direction']) {
+    const s = load();
+    const out: Record<string, number> = {};
+    for (const b of s.sleeperBookings) if (b.direction === direction && b.status !== 'cancelled' && b.status !== 'rejected') out[b.travel_date] = (out[b.travel_date] || 0) + b.seats;
+    return out;
+  }
+
+  async setSleeperStatus(id: string, status: SleeperStatus, price: number | null, note: string, actor: string) {
+    await wait();
+    const s = load();
+    const b = s.sleeperBookings.find((x) => x.id === id);
+    if (!b) return;
+    if (status === 'confirmed' && b.status !== 'confirmed') {
+      const berths = sleeperConfig(s.settings).legs[b.direction].berths;
+      // pending requests already hold their seats, so only re-check when reviving a cancelled/rejected one
+      if (berths != null && (b.status === 'cancelled' || b.status === 'rejected') && seatsTaken(s.sleeperBookings, b.direction, b.travel_date, b.id) + b.seats > berths)
+        throw new BusinessError('berths', 'ที่นอนในรอบนี้ไม่พอ', 'Not enough berths on this sailing.');
+    }
+    if (price !== b.price) b.price = price;
+    if (status !== b.status) { b.status = status; b.history.push(ev(status, note, actor)); }
+    else if (note) b.history.push(ev(status, note, actor));
+    notify(s, { audience: 'customer', phone: b.contact.phone, th: 'อัปเดตสถานะตั๋วเรือนอน', en: 'Sleeper-boat booking updated', body: b.ref });
+    audit(s, actor, `status:${status}`, 'sleeper_booking', b.ref);
+    save();
+  }
+
   async createOrder(input: Parameters<DataApi['createOrder']>[0]) {
     const v = validate(orderSchema, input);
     await wait();
@@ -246,6 +298,8 @@ export class DemoApi implements DataApi {
     if (k) return { kind: 'construction', ref: k.ref, status: k.status, service_label_th: 'งานรับเหมาก่อสร้าง', service_label_en: 'Construction', eta: k.end_date || null, history: k.history, created_at: k.created_at };
     const m = s.machineryBookings.find((x) => x.ref === r && x.contact.phone === p);
     if (m) return { kind: 'machinery', ref: m.ref, status: m.status, service_label_th: 'เช่าเครื่องจักร', service_label_en: 'Machinery rental', eta: m.start_date, history: m.history, created_at: m.created_at };
+    const sl = (s.sleeperBookings || []).find((x) => x.ref === r && x.contact.phone === p);
+    if (sl) return { kind: 'sleeper', ref: sl.ref, status: sl.status, route: `${SLEEPER_DIR[sl.direction].th} / ${SLEEPER_DIR[sl.direction].en}`, service_label_th: `ตั๋วเรือนอน · ${sl.seats} ท่าน`, service_label_en: `Sleeper boat · ${sl.seats} pax`, eta: sl.travel_date, history: sl.history, created_at: sl.created_at };
     const o = s.orders.find((x) => x.ref === r && x.contact.phone === p);
     if (o) return { kind: 'order', ref: o.ref, status: o.status, payment_status: o.payment_status, route: route(o.route_id)?.name_th, service_label_th: 'สั่งซื้อวัสดุก่อสร้าง', service_label_en: 'Materials order', eta: null, history: o.history, created_at: o.created_at };
     return null;
@@ -259,6 +313,7 @@ export class DemoApi implements DataApi {
       cargo: s.cargo.filter((x) => x.contact.phone === p),
       construction: s.construction.filter((x) => x.contact.phone === p),
       machinery: s.machineryBookings.filter((x) => x.contact.phone === p),
+      sleeper: (s.sleeperBookings || []).filter((x) => x.contact.phone === p),
       orders: s.orders.filter((x) => x.contact.phone === p),
       quotations: s.quotations.filter((x) => x.customer_phone === p && x.status !== 'draft'),
       payments: s.payments.filter((x) => x.customer_phone === p),

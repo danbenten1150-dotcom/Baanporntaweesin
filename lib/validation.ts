@@ -79,6 +79,18 @@ export const machinerySchema = z.object({
   accept_terms: z.literal(true, { errorMap: () => ({ message: 'terms' }) }),
 });
 
+export const sleeperSchema = z.object({
+  direction: z.enum(['cpn_tao', 'tao_cpn']),
+  travel_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date'),
+  passengers: z.array(z.object({
+    full_name: z.string().trim().min(2, 'required').max(120),
+    nationality: optStr,
+  })).min(1, 'min1').max(30),
+  contact: contactSchema,
+  notes: optStr,
+  accept_terms: z.literal(true, { errorMap: () => ({ message: 'terms' }) }),
+});
+
 export const orderSchema = z.object({
   lines: z.array(z.object({ product_id: z.string(), qty: z.coerce.number().positive() })).min(1, 'empty'),
   delivery_location: z.string().trim().min(3, 'required').max(300),
@@ -106,7 +118,7 @@ export const ERR_TEXT: Record<string, { th: string; en: string }> = {
   positive: { th: 'ต้องมากกว่า 0', en: 'Must be greater than 0' },
   terms: { th: 'กรุณากดยอมรับเงื่อนไขก่อนส่ง', en: 'Please accept the terms' },
   weight: { th: 'กรุณาใส่น้ำหนัก หรือเลือก “ไม่ทราบน้ำหนัก”', en: 'Enter a weight or tick “weight unknown”' },
-  date: { th: 'กรุณาเลือกวันที่ต้องการส่งสินค้า', en: 'Please choose a date' },
+  date: { th: 'กรุณาเลือกวันที่', en: 'Please choose a date' },
   empty: { th: 'ไม่มีสินค้าในตะกร้า', en: 'Cart is empty' },
 };
 

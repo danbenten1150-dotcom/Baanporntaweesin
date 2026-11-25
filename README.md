@@ -67,7 +67,7 @@ Static demo export (no server needed): `STATIC_EXPORT=1 npm run build` → `out/
 
 1. Create a project at supabase.com (region: Singapore is closest to Thailand).
 2. Install the CLI and link: `npx supabase login && npx supabase link --project-ref <ref>`
-3. Apply schema, security and functions: `npx supabase db push` (runs all 4 files in `supabase/migrations/`; `…0004_ux_update.sql` adds unknown weight/size, optional sailing, edit/reschedule and the realtime feed).
+3. Apply schema, security and functions: `npx supabase db push` (runs all 5 files in `supabase/migrations/`; `…0004_ux_update.sql` adds unknown weight/size, optional sailing, edit/reschedule and the realtime feed; `…0005_sleeper.sql` adds sleeper-boat tickets). In the Supabase SQL Editor, run the files one by one in number order.
 4. Seed: run `supabase/seed.sql` in the SQL editor. Part 1 (ports, routes, categories) is real structure; part 2 is **demo** — delete it before launch (statement at the bottom of the file).
 5. Auth → Providers: enable Email. Auth → URL configuration: set your site URL.
 6. Create the first admin: sign up on `/login`, then in the SQL editor:
@@ -120,4 +120,17 @@ public/brand         original logo (cut from the supplied banner, unaltered) and
 
 ## 8. Verified
 
-All 4 migrations were applied to PostgreSQL 16 with Supabase auth/storage shims and tested: guest booking submission, guests unable to read bookings or confirm, phone validation, tracking requires matching phone, capacity enforced on submit and confirm, cancellation releases capacity, machinery overlap rejected. The UI was tested end-to-end in demo mode (book → track → admin confirm → track shows confirmed).
+All 5 migrations were applied to PostgreSQL 16 with Supabase auth/storage shims and tested: guest booking submission, guests unable to read bookings or confirm, phone validation, tracking requires matching phone, capacity enforced on submit and confirm, cancellation releases capacity, machinery overlap rejected. The UI was tested end-to-end in demo mode (book → track → admin confirm → track shows confirmed).
+
+
+## Sleeper boat tickets (ตั๋วเรือนอน)
+
+- Customer page: `/sleeper/` — choose trip, date, passengers, contact → request is **pending** until staff confirm.
+- Sailing days from the owner: ชุมพร → เกาะเต่า **Tue/Thu/Sat**, เกาะเต่า → ชุมพร **Mon/Wed/Fri**.
+- Departure/arrival times, berths per trip and fare per person are **blank by default** — set them in
+  Admin → ตั๋วเรือนอน → ตารางเรือนอนและราคา. Blank fare shows “รอเจ้าหน้าที่ยืนยันราคา”; blank berths means no automatic limit.
+- Close single dates (weather, holidays, repairs) in the same tab.
+- Admin → ตั๋วเรือนอน → คำขอจองตั๋ว: confirm / reject / cancel / mark travelled, set the total fare, add a note the customer sees when tracking.
+- Admin → ตั๋วเรือนอน → รายชื่อผู้โดยสารรายเที่ยว: seats per trip, printable passenger list, CSV.
+- Live site: run `supabase/migrations/20261125000005_sleeper.sql` once. Berth limits are enforced in the database
+  (`submit_sleeper_booking`, with a per-trip lock so two people can't take the last berth at the same time).

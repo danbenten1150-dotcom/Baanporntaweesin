@@ -15,6 +15,7 @@ const FLOWS: Record<TrackResult['kind'], string[]> = {
   cargo: BOOKING_FLOW,
   construction: ['submitted', 'contacted', 'inspection_scheduled', 'quotation_sent', 'accepted', 'in_progress', 'completed'],
   machinery: ['pending_review', 'awaiting_quotation', 'confirmed', 'in_progress', 'completed'],
+  sleeper: ['pending_review', 'confirmed', 'completed'],
   order: ['quotation_requested', 'quoted', 'awaiting_payment', 'confirmed', 'delivering', 'delivered'],
 };
 
